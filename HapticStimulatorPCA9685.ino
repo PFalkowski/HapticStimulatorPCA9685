@@ -6,7 +6,7 @@
   Licence MIT
   (C) Piotr Falkowski 2020
 */
-
+const bool diagnosticInfo = true;
 const int MinMessageLength = 6;
 const int MaxMessageLength = 64;
 
@@ -31,14 +31,53 @@ class HapticCommand
     }
   public:
 
-    void ParseCommand(char* string)
+    void Parse(String command)
     {
+      int commaIndex = 0;
+      bool hasNextComma = true;
+      
+      int i = 0;
+      while(hasNextComma)
+      {
+        if (diagnosticInfo)
+        {
+          Serial.print("commaIndex: ");
+          Serial.println(commaIndex);
+        }
+        int nextCommaIndex = command.indexOf(',', commaIndex + 1);
+        hasNextComma = commaIndex >= 0;
+        String parsed = command.substring(commaIndex, nextCommaIndex);
+        if (parsed[0] == ',')
+        {
+           parsed = parsed.substring(1, -1);
+        }
+        
+        if (diagnosticInfo)
+        {
+          Serial.print("parsed: ");
+          Serial.println(parsed);
+          Serial.print("nextCommaIndex: ");
+          Serial.println(nextCommaIndex);
+          Serial.print("hasNextComma: ");
+          Serial.println(hasNextComma);
+        }
+        FingerStimulationStrength[i++] = parsed.toInt();
+        commaIndex = nextCommaIndex;
+      }
+      Serial.println("hasNextComma" + hasNextComma);
     }
     
-    void Play()
+    void Execute()
     {
-      for(int i=0; i<sizeof(FingerStimulationStrength); ++i)
+      for(int i=0; i < 10; ++i)
       {
+        if (diagnosticInfo)
+        {
+          Serial.print("Setting pin ");
+          Serial.print(i);
+          Serial.print(" to ");
+          Serial.println(FingerStimulationStrength[i]);
+        }
         if (FingerStimulationStrength[i] >= 4096)
         {
           set_fully_on(i);
@@ -49,7 +88,7 @@ class HapticCommand
         }
         else
         {
-          pwm.setPWM(i, FingerStimulationStrength[i], 0);
+          pwm.setPWM(i, 4096 - FingerStimulationStrength[i], 0);
         }
       }
     }
@@ -88,6 +127,8 @@ void loop()
   if (stringComplete) 
   {
     Serial.println("Received command: " + inputString + "Executing...");
+    command.Parse(inputString);
+    command.Execute();
     // clear the string:
     inputString = "";
     stringComplete = false;
