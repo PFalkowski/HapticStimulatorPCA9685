@@ -11,11 +11,14 @@ const int MinMessageLength = 6;
 const int MaxMessageLength = 64;
 
 Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
+String inputString;
+bool stringComplete = false;
 
 class HapticCommand
 {
   private:
     unsigned int PitchInHz;
+    int FingerStimulationStrength[10];
     
     void set_fully_on(uint8_t pin)
     {
@@ -26,66 +29,29 @@ class HapticCommand
     {
       pwm.setPWM(pin, 0, 4096);
     }
-
-    void setToPercent(uint8_t pin, uint8_t percentage)
-    {
-      int strength = map(percentage, 0, 100, -4096, 0);
-      if (strength < -4095)
-      {
-        set_fully_off(pin);
-      }
-      else if (strength > -1)
-      {
-        set_fully_on(pin);
-        
-      }
-    }
-
-    void Parse(char* string)
-    {
-      if (strlen(string) >= MinMessageLength)
-      {
-        char *field;
-        field = strtok(string, "," );
-        PitchInHz = atoi(field);
-        //Serial.print("Parsed PitchInHz: ");
-        //Serial.println(PitchInHz, DEC);
-        //Serial.flush();
-
-        field = strtok(nullptr, "," );
-        DurationInMs = atoi(field);
-        //Serial.print("Parsed DurationInMs: ");
-        //Serial.println(DurationInMs, DEC);
-        //Serial.flush();
-
-        field = strtok(nullptr, "," );
-        Finger = atoi(field);
-        //Serial.print("Parsed Finger: ");
-        //Serial.println(Finger, DEC);
-        //Serial.flush();
-      }
-    }
-
   public:
-    int DurationInMs = 1000;
-    int Finger = 0;
 
-    void ReadFromSerial()
+    void ParseCommand(char* string)
     {
-      char res[MaxMessageLength];
-
-      int availableBytes = Serial.available();
-      for (int i = 0; i < availableBytes; ++i)
-      {
-        res[i] = Serial.read();
-      }
-      //Serial.flush();
-      Parse(res);
     }
-
+    
     void Play()
     {
-      pwm.setPWM(Finger, 4096, 0);
+      for(int i=0; i<sizeof(FingerStimulationStrength); ++i)
+      {
+        if (FingerStimulationStrength[i] >= 4096)
+        {
+          set_fully_on(i);
+        }
+        else if (FingerStimulationStrength[i] <= 0)
+        {
+          set_fully_off(i);
+        }
+        else
+        {
+          pwm.setPWM(i, FingerStimulationStrength[i], 0);
+        }
+      }
     }
 
     void Setup(unsigned int PitchInHz, unsigned long oscillatorFrequency = 27000000, unsigned long I2CwireClock = 400000)
@@ -107,26 +73,44 @@ class HapticCommand
     }
 };
 
-
+HapticCommand command;
 void setup()
 {
+  // initialize serial:
   Serial.begin(115200);
+  // reserve bytes for the inputString:
+  inputString.reserve(256);
+  command.Setup(140);
 }
-
-uint8_t pin = 0;
 
 void loop()
 {
-  HapticCommand command;
-
-  Serial.flush();
-  if (Serial && Serial.available())
+  if (stringComplete) 
   {
-    command.ReadFromSerial();
-    delay(32);
-    command.Play();
+    Serial.println("Received command: " + inputString + "Executing...");
+    // clear the string:
+    inputString = "";
+    stringComplete = false;
   }
-  //Serial.print("Waiting for data, serial state is = ");
-  //Serial.println(Serial.available());
-  delay(32);
+}
+
+
+/*
+  SerialEvent occurs whenever a new data comes in the hardware serial RX. This
+  routine is run between each time loop() runs, so using delay inside loop can
+  delay response. Multiple bytes of data may be available.
+*/
+void serialEvent() 
+{
+  while (Serial.available()) {
+    // get the new byte:
+    char inChar = (char)Serial.read();
+    // add it to the inputString:
+    inputString += inChar;
+    // if the incoming character is a newline, set a flag so the main loop can
+    // do something about it:
+    if (inChar == '\n') {
+      stringComplete = true;
+    }
+  }
 }
