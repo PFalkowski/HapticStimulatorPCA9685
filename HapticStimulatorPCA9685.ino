@@ -6,9 +6,12 @@
   Licence MIT
   (C) Piotr Falkowski 2020
 */
-const bool diagnosticInfo = true;
+const bool diagnosticInfo = false;
 const int MinMessageLength = 6;
 const int MaxMessageLength = 64;
+const int channelsNo = 10;
+
+int FingerToPinMap[channelsNo] = {0, 1, 2, 3, 4, 8, 9, 10, 11, 12};
 
 Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
 String inputString;
@@ -18,7 +21,7 @@ class HapticCommand
 {
   private:
     unsigned int PitchInHz;
-    int FingerStimulationStrength[10];
+    int FingerStimulationStrength[channelsNo];
     
     void set_fully_on(uint8_t pin)
     {
@@ -64,7 +67,11 @@ class HapticCommand
         FingerStimulationStrength[i++] = parsed.toInt();
         commaIndex = nextCommaIndex;
       }
-      Serial.println("hasNextComma" + hasNextComma);
+        if (diagnosticInfo)
+        {
+          Serial.print("hasNextComma: ");
+          Serial.println(hasNextComma);
+        }
     }
     
     void Execute()
@@ -80,15 +87,15 @@ class HapticCommand
         }
         if (FingerStimulationStrength[i] >= 4096)
         {
-          set_fully_on(i);
+          set_fully_on(FingerToPinMap[i]);
         }
         else if (FingerStimulationStrength[i] <= 0)
         {
-          set_fully_off(i);
+          set_fully_off(FingerToPinMap[i]);
         }
         else
         {
-          pwm.setPWM(i, 4096 - FingerStimulationStrength[i], 0);
+          pwm.setPWM(FingerToPinMap[i], 4096 - FingerStimulationStrength[i], 0);
         }
       }
     }
